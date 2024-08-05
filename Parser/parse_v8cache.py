@@ -1,8 +1,10 @@
-
-import subprocess
 import os
-import requests
 import struct
+import subprocess
+
+import requests
+from parse import parse
+
 from Parser.sfi_file_parser import parse_file
 
 
@@ -43,16 +45,18 @@ def get_version(file_name):
         f.seek(4)
         version_hash = struct.unpack("<I", f.read(4))[0]
 
-    versions = requests.get("https://nodejs.org/dist/index.json").json()
+    node_versions = requests.get("https://nodejs.org/dist/index.json").json()
+    electron_versions = requests.get(
+        "https://releases.electronjs.org/releases.json"
+    ).json()
 
-    for version in versions:
-        version_parts = version["v8"].split(".")
-        major = int(version_parts[0])
-        minor = int(version_parts[1])
-        build = int(version_parts[2])
-        patch = int(version_parts[3]) if len(version_parts) > 3 else 0
+    for version in node_versions + electron_versions:
+        v8_version = version["v8"].replace("-electron.0", "")
+        major, minor, build, patch = parse("{:d}.{:d}.{:d}.{:d}", v8_version) or parse(
+            "{:d}.{:d}.{:d}.{:d}", v8_version + ".0"
+        )
         if version_hash == version_hash_64(major, minor, build, patch):
-            return version["v8"]
+            return v8_version
 
     raise RuntimeError(f"Failed to detect version for file {file_name}.")
 
