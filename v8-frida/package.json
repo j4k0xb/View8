@@ -1,0 +1,21 @@
+{
+  "name": "v8-frida-agent",
+  "version": "1.0.0",
+  "description": "Frida agent written in TypeScript",
+  "private": true,
+  "main": "agent/index.ts",
+  "scripts": {
+    "start": "frida -l _agent.js -f `which node` disassembler.js",
+    "prepare": "npm run build",
+    "build": "frida-compile agent/index.ts -o _agent.js -c",
+    "watch": "frida-compile agent/index.ts -o _agent.js -w"
+  },
+  "devDependencies": {
+    "@types/frida-gum": "^18.7.0",
+    "@types/node": "^18.19.43",
+    "frida-compile": "^16.4.1"
+  },
+  "dependencies": {
+    "bytenode": "^1.5.6"
+  }
+}
