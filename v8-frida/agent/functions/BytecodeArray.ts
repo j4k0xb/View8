@@ -1,12 +1,25 @@
-export const BytecodeArray = {
+export class BytecodeArray {
+  handle: NativePointer;
+
+  constructor(handle: NativePointer) {
+    this.handle = handle;
+  }
+
+  BytecodeArrayPrint(os: NativePointer): void {
+    BytecodeArray.BytecodeArrayPrint(this.handle, os);
+  }
+
+  Disassemble(os: NativePointer): void {
+    BytecodeArray.Disassemble(this.handle, os);
+  }
+
   /**
    * ```cpp
    * void BytecodeArrayPrint(std::ostream& os)
    * ```
    */
-  BytecodeArrayPrint: new NativeFunction(
-    Module.getExportByName(
-      null,
+  private static BytecodeArrayPrint = new NativeFunction(
+    DebugSymbol.getFunctionByName(
       "_ZN2v88internal13BytecodeArray18BytecodeArrayPrintERSo"
     ),
     "void",
@@ -14,15 +27,15 @@ export const BytecodeArray = {
       "pointer", // this
       "pointer", // os
     ]
-  ),
+  );
+
   /**
    * ```cpp
    * void Disassemble(std::ostream& os)
    * ```
    */
-  Disassemble: new NativeFunction(
-    Module.getExportByName(
-      null,
+  private static Disassemble = new NativeFunction(
+    DebugSymbol.getFunctionByName(
       "_ZN2v88internal13BytecodeArray11DisassembleERSo"
     ),
     "void",
@@ -30,5 +43,5 @@ export const BytecodeArray = {
       "pointer", // this
       "pointer", // os
     ]
-  ),
-};
+  );
+}

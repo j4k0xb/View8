@@ -15,7 +15,7 @@ But many hooks don't work as expected due to function inlining...
   Frame size 8
   Bytecode age: 0
       0 S> 0x1b1569e37e5e @    0 : 80 00 00 00       CreateClosure [0], [0], #0
-          0x1b1569e37e62 @    4 : c4                Star0
+           0x1b1569e37e62 @    4 : c4                Star0
     242 S> 0x1b1569e37e63 @    5 : a9                Return
   Constant pool (size = 1)
   0x1b1569e37e69: [FixedArray] in OldSpace
@@ -31,7 +31,7 @@ But many hooks don't work as expected due to function inlining...
   Thank you for using Frida!
   ```
 
-- [ ] disassemble all functions
+- [x] disassemble all functions
 - [ ] print ArrayBoilerplateDescription
 - [ ] print ObjectBoilerplateDescription
 - [ ] print FixedArray
