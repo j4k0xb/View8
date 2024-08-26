@@ -1,16 +1,13 @@
 {
   "compilerOptions": {
-    "target": "es2020",
-    "lib": [
-      "es2020"
-    ],
+    "target": "ESNext",
+    "moduleResolution": "Bundler",
     "allowJs": true,
     "noEmit": true,
     "strict": true,
-    "esModuleInterop": true,
-    "moduleResolution": "Node16"
+    "esModuleInterop": true
   },
-  "exclude": [
-    "_agent.js"
-  ]
+  "include": [
+    "src/**/*.ts",
+  ],
 }

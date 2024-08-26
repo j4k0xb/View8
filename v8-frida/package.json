@@ -3,17 +3,15 @@
   "version": "1.0.0",
   "description": "Frida agent written in TypeScript",
   "private": true,
-  "main": "agent/index.ts",
   "scripts": {
-    "start": "frida -l _agent.js -f `which node` disassembler.js",
-    "prepare": "npm run build",
-    "build": "frida-compile agent/index.ts -o _agent.js -c",
-    "watch": "frida-compile agent/index.ts -o _agent.js -w"
+    "prestart": "bytenode --compile test.js && npm run build",
+    "start": "frida --load _agent.js --file `which node` disassembler.js",
+    "build": "esbuild src/index.ts --bundle --platform=node --target=node16 --sourcemap=inline --outfile=_agent.js"
   },
   "devDependencies": {
     "@types/frida-gum": "^18.7.0",
     "@types/node": "^18.19.43",
-    "frida-compile": "^16.4.1"
+    "esbuild": "^0.23.1"
   },
   "dependencies": {
     "bytenode": "^1.5.6"
