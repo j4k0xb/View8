@@ -1,17 +1,16 @@
 import { SharedFunctionInfo } from "./SharedFunctionInfo.js";
 
 export class ScriptIterator {
-  handle: NativePointer;
+  handle = Memory.alloc(Process.pointerSize);
 
   constructor(isolate: NativePointer, script: NativePointer) {
-    this.handle = Memory.alloc(Process.pointerSize);
-    this.handle.writePointer(ScriptIterator.new(this.handle, isolate, script));
+    $constructor(this.handle, isolate, script);
   }
 
   [Symbol.iterator](): Iterator<SharedFunctionInfo> {
     return {
       next: () => {
-        const sfi = ScriptIterator.Next(this.handle);
+        const sfi = Next(this.handle);
         if (sfi.isNull()) {
           return { done: true, value: null };
         }
@@ -21,36 +20,28 @@ export class ScriptIterator {
       },
     };
   }
-
-  /**
-   * ```cpp
-   * SharedFunctionInfo::ScriptIterator::ScriptIterator(Isolate* isolate, Script* script)
-   * ```
-   */
-  private static new = new NativeFunction(
-    DebugSymbol.getFunctionByName(
-      "_ZN2v88internal18SharedFunctionInfo14ScriptIteratorC1EPNS0_7IsolateENS0_6ScriptE"
-    ),
-    "pointer",
-    [
-      "pointer", // destination
-      "pointer", // isolate
-      "pointer", // script
-    ]
-  );
-
-  /**
-   * ```cpp
-   * SharedFunctionInfo SharedFunctionInfo::ScriptIterator::Next()
-   * ```
-   */
-  private static Next = new NativeFunction(
-    DebugSymbol.getFunctionByName(
-      "_ZN2v88internal18SharedFunctionInfo14ScriptIterator4NextEv"
-    ),
-    "pointer",
-    [
-      "pointer", // this
-    ]
-  );
 }
+
+const $constructor = new NativeFunction(
+  DebugSymbol.getFunctionByName(
+    "_ZN2v88internal18SharedFunctionInfo14ScriptIteratorC1EPNS0_7IsolateENS0_6ScriptE"
+  ),
+  "pointer", // SharedFunctionInfo::ScriptIterator
+  [
+    "pointer", // SharedFunctionInfo::ScriptIterator destination
+    "pointer", // Isolate* isolate
+    "pointer", // Script* script
+  ]
+);
+console.log("ScriptIterator", $constructor);
+
+const Next = new NativeFunction(
+  DebugSymbol.getFunctionByName(
+    "_ZN2v88internal18SharedFunctionInfo14ScriptIterator4NextEv"
+  ),
+  "pointer", // SharedFunctionInfo
+  [
+    "pointer", // this
+  ]
+);
+console.log("ScriptIterator::Next", Next);

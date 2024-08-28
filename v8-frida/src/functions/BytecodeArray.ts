@@ -1,47 +1,41 @@
 export class BytecodeArray {
-  handle: NativePointer;
+  constructor(public handle: NativePointer) {}
 
-  constructor(handle: NativePointer) {
-    this.handle = handle;
-  }
-
+  /**
+   * @param os std::ostream&
+   */
   BytecodeArrayPrint(os: NativePointer): void {
-    BytecodeArray.BytecodeArrayPrint(this.handle, os);
+    BytecodeArrayPrint(this.handle, os);
   }
 
+  /**
+   * @param os std::ostream&
+   */
   Disassemble(os: NativePointer): void {
-    BytecodeArray.Disassemble(this.handle, os);
+    Disassemble(this.handle, os);
   }
-
-  /**
-   * ```cpp
-   * void BytecodeArrayPrint(std::ostream& os)
-   * ```
-   */
-  private static BytecodeArrayPrint = new NativeFunction(
-    DebugSymbol.getFunctionByName(
-      "_ZN2v88internal13BytecodeArray18BytecodeArrayPrintERSo"
-    ),
-    "void",
-    [
-      "pointer", // this
-      "pointer", // os
-    ]
-  );
-
-  /**
-   * ```cpp
-   * void Disassemble(std::ostream& os)
-   * ```
-   */
-  private static Disassemble = new NativeFunction(
-    DebugSymbol.getFunctionByName(
-      "_ZN2v88internal13BytecodeArray11DisassembleERSo"
-    ),
-    "void",
-    [
-      "pointer", // this
-      "pointer", // os
-    ]
-  );
 }
+
+const BytecodeArrayPrint = new NativeFunction(
+  DebugSymbol.getFunctionByName(
+    "_ZN2v88internal13BytecodeArray18BytecodeArrayPrintERSo"
+  ),
+  "void",
+  [
+    "pointer", // this
+    "pointer", // std::ostream& os
+  ]
+);
+console.log("BytecodeArray::BytecodeArrayPrint", BytecodeArrayPrint);
+
+const Disassemble = new NativeFunction(
+  DebugSymbol.getFunctionByName(
+    "_ZN2v88internal13BytecodeArray11DisassembleERSo"
+  ),
+  "void",
+  [
+    "pointer", // this
+    "pointer", // std::ostream& os
+  ]
+);
+console.log("BytecodeArray::Disassemble", Disassemble);

@@ -36,7 +36,7 @@ But many hooks don't work as expected due to function inlining...
 - [ ] print ObjectBoilerplateDescription
 - [ ] print FixedArray
 - [ ] print FixedDoubleArray
-- [ ] works with multiple node versions
+- [x] works with multiple node versions
 - [ ] works with multiple electron versions
 - [ ] docker container
 
