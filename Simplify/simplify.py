@@ -1,4 +1,5 @@
 import re
+
 from Simplify.function_context_stack import function_context_stack
 
 
@@ -217,6 +218,8 @@ class SimplifyCode:
 
         # Add the new reg to the reg scope dictionary
         self.add_reg_to_reg_scope(reg, value, reg_scope, prev_reg_scope, overwritten_regs)
+
+        value = re.sub(r"^mutable ", "", value)
         return f"{reg} = {value}"
 
     def simplify_block(self, prev_reg_scope):

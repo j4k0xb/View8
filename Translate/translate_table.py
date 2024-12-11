@@ -125,8 +125,8 @@ operands = {
 
     "CreateEmptyArrayLiteral": lambda obj: f"ACCU = []",
     "CreateEmptyObjectLiteral": lambda obj: f"ACCU = {'{}'}",
-    "CreateArrayLiteral": lambda obj: f"ACCU = ConstPool{obj.args[0]}",
-    "CreateObjectLiteral": lambda obj: f"ACCU = ConstPool{obj.args[0]}",
+    "CreateArrayLiteral": lambda obj: f"ACCU = mutable ConstPool{obj.args[0]}",
+    "CreateObjectLiteral": lambda obj: f"ACCU = mutable ConstPool{obj.args[0]}",
     "CreateRegExpLiteral": lambda obj: f"ACCU = /ConstPool{obj.args[0]}/{parse_regex_flags(int(obj.args[2][1:]))}",
     "CreateArrayFromIterable": lambda obj: f"ACCU = Array.from(ACCU)",
     "CreateClosure": lambda obj: f"ACCU = new func ConstPool{obj.args[0]}",
