@@ -189,7 +189,7 @@ class SimplifyCode:
 
         # Check if a local reg value is now overwritten in any local variables
         for k, v in reg_scope.items():
-            if type(v) == int:
+            if isinstance(v, int):
                 continue
             if is_reg_defined_in_reg_value(reg, v.value):
                 reg_scope[k].was_overwritten = True
