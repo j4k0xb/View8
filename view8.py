@@ -27,7 +27,7 @@ def decompile(all_functions):
 
 def export_to_file(out_name, all_functions, format_list):
     print(f"Exporting to file {out_name}.")
-    with open(out_name, "w") as f:
+    with open(out_name, "w", encoding="UTF-16LE") as f:
         for function_name in list(all_functions)[::-1]:
             f.write(all_functions[function_name].export(export_v8code="v8_opcode" in format_list, export_translated="translated" in format_list, export_decompiled="decompiled" in format_list))
             
