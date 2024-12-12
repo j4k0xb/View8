@@ -7,7 +7,14 @@ def expand_reg_list(reg_rang):
     end = reg_range_split[1][1:]
     if "this" in start or "this" in end:
         return ["<this>"]
-    return ['r' + str(i) for i in range(int(start), int(end) + 1, 1)]
+
+    idx_start = int(start)
+    idx_end = int(end)
+    
+    if idx_start < idx_end:
+        return ['r' + str(i) for i in range(idx_start, idx_end + 1, 1)]
+
+    return []
 
 def expand_reg_list_spread(reg_rang):
     regs = expand_reg_list(reg_rang)
