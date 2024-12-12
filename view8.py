@@ -1,7 +1,7 @@
 import argparse
 import os
 from Parser.parse_v8cache import parse_v8cache_file, parse_disassembled_file
-from Simplify.global_scope_replace import replace_global_scope
+from Simplify.fix_strings_encoding import fix_strings_encoding
 
 
 def disassemble(in_file, input_is_disassembled, disassembler):
@@ -22,7 +22,7 @@ def decompile(all_functions):
     print(f"Decompiling {len(all_functions)} functions.")
     for name in list(all_functions)[::-1]:
         all_functions[name].decompile()
-    # replace_global_scope(all_functions)
+    fix_strings_encoding(all_functions)
 
 
 def export_to_file(out_name, all_functions, format_list):
