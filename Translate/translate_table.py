@@ -10,7 +10,7 @@ def expand_reg_list(reg_rang):
 
     idx_start = int(start)
     idx_end = int(end)
-    
+
     if idx_start < idx_end:
         return ['r' + str(i) for i in range(idx_start, idx_end + 1, 1)]
 
@@ -132,8 +132,8 @@ operands = {
 
     "CreateEmptyArrayLiteral": lambda obj: f"ACCU = []",
     "CreateEmptyObjectLiteral": lambda obj: f"ACCU = {'{}'}",
-    "CreateArrayLiteral": lambda obj: f"ACCU = ConstPool{obj.args[0]}",
-    "CreateObjectLiteral": lambda obj: f"ACCU = ConstPool{obj.args[0]}",
+    "CreateArrayLiteral": lambda obj: f"ACCU = mutable ConstPool{obj.args[0]}",
+    "CreateObjectLiteral": lambda obj: f"ACCU = mutable ConstPool{obj.args[0]}",
     "CreateRegExpLiteral": lambda obj: f"ACCU = /ConstPool{obj.args[0]}/{parse_regex_flags(int(obj.args[2][1:]))}",
     "CreateArrayFromIterable": lambda obj: f"ACCU = Array.from(ACCU)",
     "CreateClosure": lambda obj: f"ACCU = new func ConstPool{obj.args[0]}",
@@ -148,28 +148,28 @@ operands = {
     "Jump": lambda obj: add_jump_blocks(obj, "Jump") or "",
     "JumpLoop": lambda obj: add_jump_blocks(obj, "JumpLoop") or "",
     "JumpIfTrue": lambda obj: add_jump_blocks(obj, "If") or "if (ACCU)",
-    "JumpIfFalse": lambda obj: add_jump_blocks(obj, "If") or "if (!ACCU)",
+    "JumpIfFalse": lambda obj: add_jump_blocks(obj, "If") or "if (!(ACCU))",
     "JumpIfNull": lambda obj: add_jump_blocks(obj, "If") or "if (ACCU == null)",
     "JumpIfNotNull": lambda obj: add_jump_blocks(obj, "If") or "if (ACCU != null)",
     "JumpIfUndefined": lambda obj: add_jump_blocks(obj, "If") or "if (ACCU == undefined)",
     "JumpIfNotUndefined": lambda obj: add_jump_blocks(obj, "If") or "if (ACCU != undefined)",
     "JumpIfUndefinedOrNull": lambda obj: add_jump_blocks(obj, "If") or "if (ACCU == undefined)",
-    "JumpIfToBooleanTrue": lambda obj: add_jump_blocks(obj, "If") or "if (ACCU)",
-    "JumpIfToBooleanFalse": lambda obj: add_jump_blocks(obj, "If") or "if (!ACCU)",
+    "JumpIfToBooleanTrue": lambda obj: add_jump_blocks(obj, "If") or "if (boolean(ACCU))",
+    "JumpIfToBooleanFalse": lambda obj: add_jump_blocks(obj, "If") or "if (!boolean(ACCU))",
     "JumpIfJSReceiver": lambda obj: add_jump_blocks(obj, "IfJSReceiver") or "if (JumpIfJSReceiver(ACCU))",
 
     "JumpConstant": lambda obj: add_jump_blocks(obj, "Jump") or "",
     "JumpLoopConstant": lambda obj: add_jump_blocks(obj, "JumpLoop") or "",
     "JumpIfTrueConstant": lambda obj: add_jump_blocks(obj, "If") or "if (ACCU)",
-    "JumpIfFalseConstant": lambda obj: add_jump_blocks(obj, "If") or "if (!ACCU)",
+    "JumpIfFalseConstant": lambda obj: add_jump_blocks(obj, "If") or "if (!(ACCU))",
     "JumpIfNullConstant": lambda obj: add_jump_blocks(obj, "If") or "if (ACCU == null)",
     "JumpIfNotNullConstant": lambda obj: add_jump_blocks(obj, "If") or "if (ACCU != null)",
     "JumpIfUndefinedConstant": lambda obj: add_jump_blocks(obj, "If") or "if (ACCU == undefined)",
     "JumpIfNotUndefinedConstant": lambda obj: add_jump_blocks(obj, "If") or "if (ACCU != undefined)",
     "JumpIfUndefinedOrNullConstant": lambda obj: add_jump_blocks(obj, "If") or "if (ACCU == undefined)",
-    "JumpIfToBooleanTrueConstant": lambda obj: add_jump_blocks(obj, "If") or "if (ACCU)",
-    "JumpIfToBooleanFalseConstant": lambda obj: add_jump_blocks(obj, "If") or "if (!ACCU)",
-    "JumpIfJSReceiverConstant": lambda obj: add_jump_blocks(obj, "IfJSReceiver") or "if (!JumpIfJSReceiver(ACCU))",
+    "JumpIfToBooleanTrueConstant": lambda obj: add_jump_blocks(obj, "If") or "if (boolean(ACCU))",
+    "JumpIfToBooleanFalseConstant": lambda obj: add_jump_blocks(obj, "If") or "if (!boolean(ACCU))",
+    "JumpIfJSReceiverConstant": lambda obj: add_jump_blocks(obj, "IfJSReceiver") or "if (JumpIfJSReceiver(ACCU))",
 
     #################
     # Load operands #

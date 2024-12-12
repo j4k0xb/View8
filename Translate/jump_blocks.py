@@ -1,3 +1,6 @@
+import re
+
+
 class CodeLine:
     def __init__(self, opcode="", line="", inst="", translated=""):
         self.v8_opcode = opcode
@@ -299,15 +302,29 @@ class JumpBlocks:
 
         return last_if
 
+    IF_EQUAL = ' == '
+    IF_UNEQUAL = ' != '
+    IF_EQUAL_STRICT = ' === '
+    IF_UNEQUAL_STRICT = ' !== '
+
+    IF_R = re.compile(r'^if \((\!)?(.+)\)$')
+
     def invert_if_statement(self, statement):
         line = self.code[statement.start].translated
-        if " != " in line:
-            self.code[statement.start].translated = line.replace(" != ", " == ")
-            return
-        if "!" in line:
-            self.code[statement.start].translated = line.replace("!", "")
-            return
-        self.code[statement.start].translated = line.replace("(", "(!")
+
+        if JumpBlocks.IF_EQUAL in line:
+            self.code[statement.start].translated = line.replace(JumpBlocks.IF_EQUAL, JumpBlocks.IF_UNEQUAL)
+        elif JumpBlocks.IF_UNEQUAL in line:
+            self.code[statement.start].translated = line.replace(JumpBlocks.IF_UNEQUAL, JumpBlocks.IF_EQUAL)
+        elif JumpBlocks.IF_EQUAL_STRICT in line:
+            self.code[statement.start].translated = line.replace(JumpBlocks.IF_EQUAL_STRICT, JumpBlocks.IF_UNEQUAL_STRICT)
+        elif JumpBlocks.IF_UNEQUAL_STRICT in line:
+            self.code[statement.start].translated = line.replace(JumpBlocks.IF_UNEQUAL_STRICT, JumpBlocks.IF_EQUAL_STRICT)
+        else:
+            assert (m := JumpBlocks.IF_R.match(line))
+            neg, cond = m.groups()
+
+            self.code[statement.start].translated = 'if ({}{}{})'.format('' if neg else '!(', cond, '' if neg else ')')
 
     def get_or_and_table(self, all_if, last_if):
         known_type_table = {self.get_relative_offset(last_if.start, 1): "||", last_if.end: "&&"}
@@ -328,7 +345,7 @@ class JumpBlocks:
 
         # If its a if that jump that ends in the same line add {} (open and close) after the if end bracket (
         if first_if.start == first_if.end:
-            self.code[first_if.start].translated = self.code[first_if.start].translated.replace(")", ") {}\n")
+            self.code[first_if.start].translated = self.code[first_if.start].translated.replace("))", ")) {}\n")
             self.jump_done(first_if)
             return True
 
@@ -336,8 +353,9 @@ class JumpBlocks:
 
         all_if = [i for i in self.jump_table['If'].values() if first_if.start <= i.start <= last_if.start and i.start != i.end]
         and_or_table = self.get_or_and_table(all_if, last_if)
+        has_many = len(all_if) > 1
 
-        last_statement = "if"
+        last_statement = "if (" if has_many else 'if '
         for if_jmp in all_if:
             if if_jmp.end not in and_or_table:
                 continue
@@ -346,11 +364,11 @@ class JumpBlocks:
                 self.invert_if_statement(if_jmp)
 
             # Replace "if" with the last statement (&& or ||)
-            self.code[if_jmp.start].translated = self.code[if_jmp.start].translated.replace("if", last_statement)
-            last_statement = "\t" + and_or_table[if_jmp.end]
+            self.code[if_jmp.start].translated = self.code[if_jmp.start].translated.replace("if ", last_statement)
+            last_statement = "\t{} ".format(and_or_table[if_jmp.end])
             self.jump_done(if_jmp)
 
-        self.code[last_if.start].translated += "\n{"
+        self.code[last_if.start].translated += "{}\n{{".format(')' if has_many else '')
 
         # Handle the else part if there is an else_jump
         else_jump = self.jump_table['Jump'].get(last_if.end, None)
@@ -394,6 +412,7 @@ class JumpBlocks:
     def expand_code_list(self):
         self.code_list.insert(0, CodeLine(translated="{"))
         i = 0
+
         while i < len(self.code_list):
             lines = self.code_list[i].translated.split('\n')
             if len(lines) > 1:

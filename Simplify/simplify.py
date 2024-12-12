@@ -101,7 +101,7 @@ class SimplifyCode:
     def get_next_line(self):
         self.line_index += 1
         if self.line_index >= len(self.code):
-            print("Error decompiling {self.sfi.name}, no more lines.")
+            print(f"Error decompiling {self.sfi.name}, no more lines.")
         line_obj = self.code[self.line_index]
         return line_obj.translated
 
@@ -210,13 +210,16 @@ class SimplifyCode:
 
         # replace constant regs
         if not re.search(r"^(ACCU|CASE_\d+|[ra]\d+) = ", line):
-            return self.replace_reg_with_constant(line, reg_scope)
+            line = self.replace_reg_with_constant(line, reg_scope)
+            return re.sub(r"= mutable ", "= ", line)
 
         reg, value = line.split(" = ", 1)
         value = self.replace_reg_with_constant(value, reg_scope)
 
         # Add the new reg to the reg scope dictionary
         self.add_reg_to_reg_scope(reg, value, reg_scope, prev_reg_scope, overwritten_regs)
+
+        value = re.sub(r"^mutable ", "", value)
         return f"{reg} = {value}"
 
     def simplify_block(self, prev_reg_scope):
@@ -254,7 +257,7 @@ def simplify_translated_bytecode(sfi, code):
     simplify = SimplifyCode(code, sfi)
     regs = {"current_context": function_context_stack.get_func_context(sfi.name, sfi.declarer)}
     simplify.simplify_block(regs)
-    if simplify.line_index != len(code) -1:
+    if simplify.line_index + 1 != len(code):
         print(f"Warning! failed to decompile {sfi.name} stopped after {simplify.line_index}/{len(code)-1}")
 
 
