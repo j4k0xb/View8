@@ -11,10 +11,11 @@ def expand_reg_list(reg_rang):
     idx_start = int(start)
     idx_end = int(end)
 
-    if idx_start < idx_end:
-        return ['r' + str(i) for i in range(idx_start, idx_end + 1, 1)]
+    if 0 == idx_start == idx_end:  # r0-r0 is only possible for an empty list
+        return []
 
-    return []
+    return ['r' + str(i) for i in range(idx_start, idx_end + 1, 1)]
+
 
 def expand_reg_list_spread(reg_rang):
     regs = expand_reg_list(reg_rang)
@@ -22,6 +23,7 @@ def expand_reg_list_spread(reg_rang):
         return f"...{regs[0]}"
     else:
         return f"{', '.join(regs[:-1])}, ...{regs[-1]}"
+
 
 def get_typeof_value(typeof_num):
     typeof_dict = {
