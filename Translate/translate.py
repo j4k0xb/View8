@@ -43,13 +43,19 @@ class TranslateBytecode:
         self.jump_table = {"Loop": {}, "Exception": {}, "Catch": {}, "IntSwitch": {}, "If": {}, "Jump": {}, "IfJSReceiver": {}}
         self.add_exception_jumps(exception_table)
 
-        for line in code:
+        for i, line in enumerate(code):
             self.offset = line.line_num
             self.operator, *self.args = line.v8_instruction.split(' ', 1)
             self.operator = self.operator.split('.')[0]
             self.args = self.args[0].split(", ") if self.args else []
             line.translated = operands.get(self.operator, operands["Not Found"])(self)
             line.translated = line.translated.replace("<this>", "this")
+            line.translated = line.translated.replace("<closure>", "closure")
+
+            if line.translated == 'ACCU = DeclareGlobals(r1, r2)':
+                line.visible = False
+                code[i - 1].visible = False
+                code[i - 2].visible = False
 
         convert_jumps_to_logical_flow(name, code, self.jump_table)
 

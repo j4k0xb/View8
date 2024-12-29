@@ -1,3 +1,4 @@
+import re
 from Translate.translate import translate_bytecode
 from Simplify.simplify import simplify_translated_bytecode
 
@@ -56,7 +57,15 @@ class SharedFunctionInfo:
             else:
                 return var
 
+        # simplified version of https://github.com/babel/babel/blob/3a22eecc40a0dae01220ad57b570eac30c90c7fe/packages/babel-helper-validator-identifier/src/identifier.ts#L87
+        def is_identifier_name(name):
+            return re.match(r'^"[a-zA-Z_$][a-zA-Z0-9_$]*"$', name)
+
         replacements = {}
+        # replace e.g. obj["key"] with obj.key
+        replacements.update({
+            f"[LiteralConstPool[{idx}]]": f".{var[1:-1]}" for idx, var in enumerate(self.const_pool) if is_identifier_name(var)
+        })
         replacements.update({
             f"LiteralConstPool[{idx}]": var for idx, var in enumerate(self.const_pool)
         })
