@@ -1,6 +1,7 @@
 from Parser.shared_function_info import SharedFunctionInfo, CodeLine
 from parse import parse
 import re
+import json
 
 all_functions = {}
 repeat_last_line = False
@@ -77,8 +78,14 @@ def parse_const_line(lines, func_name):
     if value == "<null>":
         return var_idx, "null"
     if value.startswith("<String"):
-        value = value.split("#", 1)[-1].rstrip('> ').replace('"', '\\"')
-        return var_idx, f'"{value}"'
+        # unicode/json format from newer disassembler
+        json_match = re.search(r"^<String\[\d+\]: (\".*\")>$", value)
+        if json_match:
+            value = json.loads(json_match.group(1))
+            return var_idx, json.dumps(value, ensure_ascii=False)
+        else:
+            value = value.split("#", 1)[-1].rstrip('> ').replace('"', '\\"')
+            return var_idx, f'"{value}"'
     if value.startswith("<SharedFunctionInfo"):
         value = value.split(" ", 1)[-1].rstrip('> ') if " " in value else ""
         return var_idx, parse_shared_function_info(lines, value, func_name)

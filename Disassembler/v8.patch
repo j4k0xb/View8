@@ -78,13 +78,15 @@ index 559160358c1..420b3da2b66 100644
      }
      case JS_MESSAGE_OBJECT_TYPE:
 diff --git a/src/objects/string.cc b/src/objects/string.cc
-index cd134f84055..285d55fda5e 100644
+index e2f18a6e849..10c76320040 100644
 --- a/src/objects/string.cc
 +++ b/src/objects/string.cc
-@@ -477,13 +477,6 @@ void String::StringShortPrint(StringStream* accumulator) {
-   accumulator->Add("<String[%u]: ", len);
-   accumulator->Add(PrefixForDebugPrint());
+@@ -689,17 +689,9 @@ void String::StringShortPrint(StringStream* accumulator) {
  
+   const int len = length();
+   accumulator->Add("<String[%u]: ", len);
+-  accumulator->Add(PrefixForDebugPrint());
+-
 -  if (len > kMaxShortPrintLength) {
 -    accumulator->Add("...<truncated>>");
 -    accumulator->Add(SuffixForDebugPrint());
@@ -92,9 +94,34 @@ index cd134f84055..285d55fda5e 100644
 -    return;
 -  }
 -
++  accumulator->Put('"');
    PrintUC16(accumulator, 0, len);
-   accumulator->Add(SuffixForDebugPrint());
+-  accumulator->Add(SuffixForDebugPrint());
++  accumulator->Put('"');
    accumulator->Put('>');
+ }
+ 
+@@ -720,10 +712,18 @@ void String::PrintUC16(StringStream* accumulator, int start, int end) {
+       accumulator->Add("\\n");
+     } else if (c == '\r') {
+       accumulator->Add("\\r");
++    } else if (c == '\b') {
++      accumulator->Add("\\t");
++    } else if (c == '\f') {
++      accumulator->Add("\\b");
++    } else if (c == '\t') {
++      accumulator->Add("\\f");
++    } else if (c == '"') {
++      accumulator->Add("\\\"");
+     } else if (c == '\\') {
+       accumulator->Add("\\\\");
+-    } else if (!std::isprint(c)) {
+-      accumulator->Add("\\x%02x", c);
++    } else if (c < 0x20 || c > 0x7F) {
++      accumulator->Add("\\u%04x", c);
+     } else {
+       accumulator->Put(static_cast<char>(c));
+     }
 diff --git a/src/snapshot/code-serializer.cc b/src/snapshot/code-serializer.cc
 index 3f380e6a2ff..1f55cb9009a 100644
 --- a/src/snapshot/code-serializer.cc
