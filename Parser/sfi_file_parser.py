@@ -12,15 +12,16 @@ def set_repeat_line_flag(flag):
 
 
 def get_next_line(file):
-    with open(file, errors="replace") as f:
-        for line in f:
-            line = line.strip()
-            if not line:
-                continue
+    with open(file, errors="replace", newline='') as f:
+        content = f.read()
+    for line in content.split('\n'):
+        line = line.strip()
+        if not line:
+            continue
+        yield line
+        if repeat_last_line:
+            set_repeat_line_flag(False)
             yield line
-            if repeat_last_line:
-                set_repeat_line_flag(False)
-                yield line
     yield None
 
 
