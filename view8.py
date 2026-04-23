@@ -17,20 +17,25 @@ def disassemble(in_file, input_is_disassembled, disassembler):
     return parse_disassembled_file(out_name)
 
 
-def decompile(all_functions):
+def decompile(all_functions, nested):
     # Decompile
     print(f"Decompiling {len(all_functions)} functions.")
+    if nested:
+        for name in list(all_functions):
+            all_functions[name].const_functions = {const: all_functions[const] for const in all_functions[name].const_pool if const.startswith('func_')}
     for name in list(all_functions)[::-1]:
-        all_functions[name].decompile()
+        if not nested or all_functions[name].declarer is None:
+            all_functions[name].decompile(nested)
     # replace_global_scope(all_functions)
 
 
-def export_to_file(out_name, all_functions, format_list):
+def export_to_file(out_name, all_functions, format_list, nested):
     print(f"Exporting to file {out_name}.")
     with open(out_name, "w") as f:
         for function_name in list(all_functions)[::-1]:
-            f.write(all_functions[function_name].export(export_v8code="v8_opcode" in format_list, export_translated="translated" in format_list, export_decompiled="decompiled" in format_list))
-            
+            if not nested or all_functions[function_name].declarer is None:
+                f.write(all_functions[function_name].export(export_v8code="v8_opcode" in format_list, export_translated="translated" in format_list, export_decompiled="decompiled" in format_list, nested=nested))
+
 
 def main():
     parser = argparse.ArgumentParser(description="View8: V8 cache decompiler.")
@@ -41,6 +46,7 @@ def main():
     parser.add_argument('--export_format', '-e', nargs='+', choices=['v8_opcode', 'translated', 'decompiled'], 
                         help="Specify the export format(s). Options are 'v8_opcode', 'translated', and 'decompiled'. Multiple options can be combined.", 
                         default=['decompiled'])
+    parser.add_argument('--nested', '-n', action='store_true', help="Export nested format.", default=False)
 
     args = parser.parse_args()
     
@@ -48,8 +54,8 @@ def main():
         raise FileNotFoundError(f"The input file {args.input_file} does not exist.")
 
     all_func = disassemble(args.input_file, args.disassembled, args.path)
-    decompile(all_func)
-    export_to_file(args.output_file, all_func, args.export_format)
+    decompile(all_func, args.nested)
+    export_to_file(args.output_file, all_func, args.export_format, args.nested)
     print(f"Done.")
 
 

@@ -4,6 +4,7 @@ class CodeLine:
         self.line_num = line
         self.v8_instruction = inst
         self.translated = translated
+        self.pre_defined = None
         self.decompiled = ""
         self.visible = True
 

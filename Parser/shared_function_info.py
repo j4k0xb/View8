@@ -8,6 +8,7 @@ class CodeLine:
         self.line_num = line
         self.v8_instruction = inst
         self.translated = translated
+        self.pre_defined = None
         self.decompiled = decompiled
         self.visible = True
 
@@ -23,6 +24,7 @@ class SharedFunctionInfo:
         self.const_pool = None
         self.exception_table = None
         self.kind = None
+        self.defined = False
 
     def is_fully_parsed(self):
         return all(
@@ -49,7 +51,7 @@ class SharedFunctionInfo:
     def simplify_bytecode(self):
         simplify_translated_bytecode(self, self.code)
 
-    def replace_const_pool(self):
+    def replace_const_pool(self, nested: bool):
         def unescape(var):
             if var.startswith('"') and var.endswith('"'):
                 return var[1:-1].replace('\\\\', '\\')
@@ -67,27 +69,40 @@ class SharedFunctionInfo:
             if not line.visible:
                 continue
             for const_id, var in replacements.items():
+                if const_id not in line.decompiled:
+                    continue
+                if nested and var in self.const_functions and not self.const_functions[var].defined:
+                    self.const_functions[var].decompile(nested)
+                    if line.pre_defined is None:
+                        line.pre_defined = []
+                    line.pre_defined.append(self.const_functions[var])
                 line.decompiled = line.decompiled.replace(const_id, var)
 
-    def decompile(self):
+    def decompile(self, nested: bool):
         self.translate_bytecode()
         self.simplify_bytecode()
-        self.replace_const_pool()
+        self.replace_const_pool(nested)
+        self.defined = True
 
-    def export(self, export_v8code=False, export_translated=False, export_decompiled=True):
-        export_func = self.create_function_header() + '\n'
+    def export(self, export_v8code=False, export_translated=False, export_decompiled=True, nested=False, nested_level=0, tab_level=0):
+        export_padding = (' ' * ((6+50)*export_v8code+60*export_translated)) * nested_level + '\t' * tab_level
+        export_func = export_padding + self.create_function_header() + '\n'
         for line in self.code:
             if (not line.visible or not line.decompiled) and not export_v8code and not export_translated:
                 continue
 
-            export_line = ""
+            export_line = export_padding
             if export_v8code:
                 export_line += f'{line.line_num:<6}'
                 export_line += f'{line.v8_instruction:<50}'
             if export_translated:
                 export_line += f'{line.translated:<60}'
             if export_decompiled:
-                export_line += f'{line.decompiled}' * line.visible
-            if export_line:
+                if line.visible:
+                    if nested and line.pre_defined:
+                        for const_function in line.pre_defined:
+                            export_line = const_function.export(export_v8code, export_translated, export_decompiled, nested, nested_level+1, tab_level + line.tab_level) + export_line
+                    export_line += '\t' * line.tab_level + f'{line.decompiled}'
+            if export_line != export_padding:
                 export_func += export_line + '\n'
         return export_func

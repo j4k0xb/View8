@@ -106,7 +106,8 @@ class SimplifyCode:
         return line_obj.translated
 
     def add_simplified_line(self, line):
-        self.code[self.line_index].decompiled = '\t' * self.tab_level + line if line else ""
+        self.code[self.line_index].tab_level = self.tab_level
+        self.code[self.line_index].decompiled = line if line else ""
 
     def change_context(self, line, reg_scope):
         # Change current_context index
