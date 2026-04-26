@@ -23,6 +23,7 @@
 <li><code>--path</code>, <code>-p</code>: Path to disassembler binary (optional).</li>
 <li><code>--disassembled</code>, <code>-d</code>: Indicate if the input file is already disassembled (optional).</li>
 <li><code>--export_format</code>, <code>-e</code>: Specify the export format(s). Options are <code>v8_opcode</code>, <code>translated</code>, and <code>decompiled</code>. Multiple options can be combined (optional, default: <code>decompiled</code>).</li>
+<li><code>--nested</code>, <code>-n</code>: Export nested format (optional).</li>
 </ul>
 
 <h3>Basic Usage</h3>
@@ -34,6 +35,9 @@
 <h3>Processing Disassembled Files</h3>
 <p>To skip the disassembling process and provide an already disassembled file as the input, use the <code>--disassembled</code> (or <code>-d</code>) flag:</p>
 <pre><code>python view8.py input_file output_file --disassembled</code></pre>
+<h3>Export nested format instead of flattening</h3>
+<p>To export code with nested function definition, use the <code>--nested</code> (or <code>-n</code>) flag:</p>
+<pre><code>python view8.py input_file output_file --nested</code></pre>
 <h3>Export Formats</h3>
 <p>Specify the export format(s) using the <code>--export_format</code> (or <code>-e</code>) option. You can combine multiple formats:</p>
 <ul>
