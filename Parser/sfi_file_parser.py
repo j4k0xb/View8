@@ -62,12 +62,18 @@ def parse_bytecode(line, lines):
     set_repeat_line_flag(True)
     return code_list
 
+def unescape_x_escape_to_unicode(value: str):
+    try:
+        value = value.replace(r'\x', r'\u').encode().decode('unicode_escape')
+        return value
+    except UnicodeDecodeError as e:
+        return value
 
 def parse_const_line(lines, func_name):
     var_line = next(lines)
     match = re.search(r"^(\d+(?:\-\d+)?):\s(0x[0-9a-fA-F]+\s)?(.+)", var_line)
     if not match:
-        raise ValueError(f"Invalid constant line format: {var_line}")
+        raise ValueError(f"Invalid constant line format: {var_line} {lines} {func_name}")
 
     idx_range, address, value = match.groups()
     var_idx = int(idx_range.split('-')[-1]) + 1
@@ -78,6 +84,7 @@ def parse_const_line(lines, func_name):
         return var_idx, "null"
     if value.startswith("<String"):
         value = value.split("#", 1)[-1].rstrip('> ').replace('"', '\\"')
+        value = unescape_x_escape_to_unicode(value)
         return var_idx, f'"{value}"'
     if value.startswith("<SharedFunctionInfo"):
         value = value.split(" ", 1)[-1].rstrip('> ') if " " in value else ""
