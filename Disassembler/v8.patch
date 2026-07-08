@@ -1,8 +1,8 @@
 diff --git a/src/diagnostics/objects-printer.cc b/src/diagnostics/objects-printer.cc
-index 5b546e29926..45d7b50b7f5 100644
+index ce4d15b2c27..a02e48c37f4 100644
 --- a/src/diagnostics/objects-printer.cc
 +++ b/src/diagnostics/objects-printer.cc
-@@ -1687,7 +1687,6 @@ void SharedFunctionInfo::SharedFunctionInfoPrint(std::ostream& os) {
+@@ -1719,7 +1719,6 @@ void SharedFunctionInfo::SharedFunctionInfoPrint(std::ostream& os) {
    os << "\n - data: " << Brief(function_data(kAcquireLoad));
    os << "\n - code (from data): ";
    os << Brief(GetCode());
@@ -10,7 +10,7 @@ index 5b546e29926..45d7b50b7f5 100644
    // Script files are often large, thus only print their {Brief} representation.
    os << "\n - script: " << Brief(script());
    os << "\n - function token position: " << function_token_position();
-@@ -1710,6 +1709,10 @@ void SharedFunctionInfo::SharedFunctionInfoPrint(std::ostream& os) {
+@@ -1742,6 +1741,10 @@ void SharedFunctionInfo::SharedFunctionInfoPrint(std::ostream& os) {
      os << "<none>";
    }
    os << "\n";
@@ -22,10 +22,10 @@ index 5b546e29926..45d7b50b7f5 100644
  
  void JSGlobalProxy::JSGlobalProxyPrint(std::ostream& os) {
 diff --git a/src/objects/objects.cc b/src/objects/objects.cc
-index 559160358c1..420b3da2b66 100644
+index c15ac8656ad..62b064bf3b4 100644
 --- a/src/objects/objects.cc
 +++ b/src/objects/objects.cc
-@@ -1850,6 +1850,16 @@ void HeapObject::HeapObjectShortPrint(std::ostream& os) {
+@@ -1833,6 +1833,16 @@ void HeapObject::HeapObjectShortPrint(std::ostream& os) {
      os << accumulator.ToCString().get();
      return;
    }
@@ -42,7 +42,7 @@ index 559160358c1..420b3da2b66 100644
    switch (map(cage_base).instance_type()) {
      case MAP_TYPE: {
        os << "<Map";
-@@ -1936,14 +1946,24 @@ void HeapObject::HeapObjectShortPrint(std::ostream& os) {
+@@ -1919,14 +1929,24 @@ void HeapObject::HeapObjectShortPrint(std::ostream& os) {
        break;
      case FIXED_ARRAY_TYPE:
        os << "<FixedArray[" << FixedArray::cast(*this).length() << "]>";
@@ -67,7 +67,7 @@ index 559160358c1..420b3da2b66 100644
        break;
      case BYTE_ARRAY_TYPE:
        os << "<ByteArray[" << ByteArray::cast(*this).length() << "]>";
-@@ -2022,6 +2042,9 @@ void HeapObject::HeapObjectShortPrint(std::ostream& os) {
+@@ -2005,6 +2025,9 @@ void HeapObject::HeapObjectShortPrint(std::ostream& os) {
        } else {
          os << "<SharedFunctionInfo>";
        }
@@ -78,10 +78,10 @@ index 559160358c1..420b3da2b66 100644
      }
      case JS_MESSAGE_OBJECT_TYPE:
 diff --git a/src/objects/string.cc b/src/objects/string.cc
-index cd134f84055..285d55fda5e 100644
+index cf7b0afd927..aa66270f71b 100644
 --- a/src/objects/string.cc
 +++ b/src/objects/string.cc
-@@ -477,13 +477,6 @@ void String::StringShortPrint(StringStream* accumulator) {
+@@ -646,13 +646,6 @@ void String::StringShortPrint(StringStream* accumulator) {
    accumulator->Add("<String[%u]: ", len);
    accumulator->Add(PrefixForDebugPrint());
  
@@ -95,24 +95,41 @@ index cd134f84055..285d55fda5e 100644
    PrintUC16(accumulator, 0, len);
    accumulator->Add(SuffixForDebugPrint());
    accumulator->Put('>');
+@@ -677,10 +670,14 @@ void String::PrintUC16(StringStream* accumulator, int start, int end) {
+       accumulator->Add("\\r");
+     } else if (c == '\\') {
+       accumulator->Add("\\\\");
+-    } else if (!std::isprint(c)) {
++    } else if (c >= 0x20 && c <= 0x7e) {
++      // 仅 ASCII 可打印字符原样输出；避免对 c>=0x100 调用 std::isprint（未定义行为），
++      // 也避免 Put(static_cast<char>(c>) 把高位字节截断（导致中文等字符变成乱码）。
++      accumulator->Put(static_cast<char>(c));
++    } else if (c < 0x100) {
+       accumulator->Add("\\x%02x", c);
+     } else {
+-      accumulator->Put(static_cast<char>(c));
++      accumulator->Add("\\x%04x", c);
+     }
+   }
+ }
 diff --git a/src/snapshot/code-serializer.cc b/src/snapshot/code-serializer.cc
-index 3f380e6a2ff..1f55cb9009a 100644
+index 95352299f8d..b71f0001603 100644
 --- a/src/snapshot/code-serializer.cc
 +++ b/src/snapshot/code-serializer.cc
-@@ -466,6 +466,12 @@ MaybeHandle<SharedFunctionInfo> CodeSerializer::Deserialize(
-     if (FLAG_profile_deserialization) PrintF("[Deserializing failed]\n");
+@@ -468,6 +468,12 @@ MaybeHandle<SharedFunctionInfo> CodeSerializer::Deserialize(
+     if (v8_flags.profile_deserialization) PrintF("[Deserializing failed]\n");
      return MaybeHandle<SharedFunctionInfo>();
    }
-+
++  
 +  std::cout << "\nStart SharedFunctionInfo\n";
 +  result->SharedFunctionInfoPrint(std::cout);
 +  std::cout << "\nEnd SharedFunctionInfo\n";
 +  std::cout << std::flush;
-+
++  
    BaselineBatchCompileIfSparkplugCompiled(isolate,
                                            Script::cast(result->script()));
-   if (FLAG_profile_deserialization) {
-@@ -651,9 +657,7 @@ SerializedCodeData::SerializedCodeData(const std::vector<byte>* payload,
+   if (v8_flags.profile_deserialization) {
+@@ -655,9 +661,7 @@ SerializedCodeData::SerializedCodeData(const std::vector<byte>* payload,
  
  SerializedCodeSanityCheckResult SerializedCodeData::SanityCheck(
      uint32_t expected_source_hash) const {
@@ -124,7 +141,7 @@ index 3f380e6a2ff..1f55cb9009a 100644
  
  SerializedCodeSanityCheckResult SerializedCodeData::SanityCheckJustSource(
 diff --git a/src/snapshot/deserializer.cc b/src/snapshot/deserializer.cc
-index 09fffbbed37..8ce3b2680ef 100644
+index d6592a5eeb0..9226f04d223 100644
 --- a/src/snapshot/deserializer.cc
 +++ b/src/snapshot/deserializer.cc
 @@ -210,7 +210,6 @@ Deserializer<IsolateT>::Deserializer(IsolateT* isolate,

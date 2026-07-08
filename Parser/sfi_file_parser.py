@@ -12,7 +12,8 @@ def set_repeat_line_flag(flag):
 
 
 def get_next_line(file):
-    with open(file, errors="replace", newline='') as f:
+    # 使用 latin-1 编码读取，保留所有原始字节（包括 0x80-0xFF）
+    with open(file, encoding='latin-1', newline='') as f:
         content = f.read()
     for line in content.split('\n'):
         line = line.strip()
@@ -64,11 +65,57 @@ def parse_bytecode(line, lines):
     return code_list
 
 def unescape_x_escape_to_unicode(value: str):
+    r"""
+    解码 V8 反汇编输出的字符串。
+    处理两种格式：
+    1. \xHHHH - Unicode 码点转义 (如 \x4e0b = 下)
+    2. 原始二进制字节 - 替换为 � (V8 反汇编器的 bug 导致的错误字节)
+    """
+    import re
+
     try:
-        value = value.replace(r'\x', r'\u').encode().decode('unicode_escape')
+        # 把 \xHHHH 格式转换为 \uHHHH
+        def replace_escape(match):
+            return r'\u' + match.group(1)
+
+        value = re.sub(r'\\x([0-9a-fA-F]{4})', replace_escape, value)
+
+        # 编码为 latin-1 然后解码 unicode_escape
+        result = value.encode('latin-1').decode('unicode_escape')
+
+        # 替换无效字符：
+        # 1. Latin-1 范围内的无效字符 (U+0080-U+00FF) - 来自原始二进制字节
+        # 2. 控制字符 (U+0000-U+001F)，除了常用的空白字符
+        def replace_invalid_char(match):
+            return '�'
+
+        # 替换 U+0080-U+00FF 和 U+0000-U+001F (除了 tab, newline)
+        # 注意：\r (0x0d) 在 V8 反汇编输出中是错误字节，也需要替换
+        # 换行/回车/制表符 -> JS 转义序列，保证输出字符串仍是单行且可读
+        # (例如 PEM 证书里的换行、多行文本)
+        result = result.replace('\n', '\\n').replace('\r', '\\r').replace('\t', '\\t')
+        result = re.sub(r'[\u0000-\u001f\u0080-\u00ff]', replace_invalid_char, result)
+
+        return result
+    except Exception as e:
         return value
-    except UnicodeDecodeError as e:
-        return value
+
+def _looks_structural(line):
+    """判断一行是否像"结构性内容"（新的常量条目或反汇编段落标记），
+    而不是某个跨行字符串的正文延续。用于在拼接跨行 <String> 时及时停止。"""
+    if re.match(r"^\d+(?:-\d+)?:\s", line):
+        return True
+    if re.match(r"^0x[0-9a-fA-F]+\s*@", line):  # 字节码行
+        return True
+    for kw in ("Constant pool", "Handler Table", "Source Position Table",
+               "End ", "Start ", "Parameter count", "Register count",
+               "Frame size", "Bytecode age", "- length:", "- map:",
+               "Slot #", "SharedFunctionInfo", "FixedArray",
+               "ObjectBoilerplate", "ArrayBoilerplate", "FeedbackMetadata"):
+        if kw in line:
+            return True
+    return False
+
 
 def parse_const_line(lines, func_name):
     var_line = next(lines)
@@ -84,6 +131,21 @@ def parse_const_line(lines, func_name):
     if value == "<null>":
         return var_idx, "null"
     if value.startswith("<String"):
+        # u# (unicode) 字符串的内容可能包含原始换行符 (0x0A)，反汇编器会原样输出，
+        # 导致一个 <String ...> 描述符被拆到多个物理行（甚至漏掉闭合的 '>')。
+        # 仅当后续行"不像结构性内容"时才拼接；一旦遇到新常量条目或段落标记，
+        # 就把该行放回（repeat）并停止——宁可截断该字符串，也不要吞掉后续内容导致整体失配。
+        if not value.endswith(">"):
+            for _ in range(64):  # 安全上限，防止异常输入导致死循环
+                nxt = next(lines)
+                if nxt is None:
+                    break
+                if _looks_structural(nxt):
+                    set_repeat_line_flag(True)  # 把 nxt 放回，交给下一个消费者
+                    break
+                value += "\n" + nxt
+                if value.endswith(">"):
+                    break
         value = value.split("#", 1)[-1].rstrip('> ').replace('"', '\\"')
         value = unescape_x_escape_to_unicode(value)
         return var_idx, f'"{value}"'
