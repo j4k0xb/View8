@@ -16,6 +16,7 @@ class SharedFunctionInfo:
     def __init__(self):
         self.name = None
         self.declarer = None
+        self.has_bytecode = None
         self.function_header = None
         self.argument_count = None
         self.register_count = None
@@ -25,6 +26,10 @@ class SharedFunctionInfo:
         self.kind = None
 
     def is_fully_parsed(self):
+        # Newer V8 prints SharedFunctionInfos that were never compiled
+        # (UncompiledData, no bytecode) - those have no code/registers.
+        if self.has_bytecode is False:
+            return True
         return all(
             value is not None for value in [
                 self.argument_count, self.register_count,

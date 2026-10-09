@@ -371,7 +371,7 @@ operands = {
     "ForInNext": lambda obj: f"ACCU = {obj.args[0]}.next().value",
     "ForInStep": lambda obj: f"ACCU = GeneratorStep({obj.args[0]})",
 
-    "Not Found": lambda obj: input(f"Operator {obj.operator} was not found in table") and f"//{obj.operator})",
+    "Not Found": lambda obj: f"/*{obj.operator}*/",
 
 }
 

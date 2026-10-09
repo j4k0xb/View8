@@ -25,6 +25,8 @@ class TranslateBytecode:
         self.jump_table = None
 
     def add_exception_jumps(self, et):
+        if not et:
+            return
         for catch_start, try_start in et.items():
             self.jump_table["Exception"][try_start[0]] = Jump(jump_type="Exception", start=try_start[0], end=catch_start)
 

@@ -39,8 +39,13 @@ def parse_array(lines, func_name):
 
 
 def parse_object(lines, func_name):
-    if "Start " not in (line := next(lines)):
-        raise Exception(f"Error got line \"{line}\" not Start Object")
+    line = next(lines)
+    if "Start " not in line:
+        # Newer v8 prints an object header line before the Start marker.
+        if "ObjectBoilerplateDescription" in line:
+            line = next(lines)
+        if "Start " not in line:
+            raise Exception(f"Error got line \"{line}\" not Start Object")
     const_list = iter(parse_const_array(lines, func_name)[1:])
     object_literal = "{" + ", ".join([f"{key}: {value}" for key, value in zip(const_list, const_list)]) + "}"
     while "End " not in (line := next(lines)):
@@ -119,9 +124,12 @@ def _looks_structural(line):
 
 def parse_const_line(lines, func_name):
     var_line = next(lines)
+    if var_line is None:
+        return -1, ""
     match = re.search(r"^(\d+(?:\-\d+)?):\s(0x[0-9a-fA-F]+\s)?(.+)", var_line)
     if not match:
-        raise ValueError(f"Invalid constant line format: {var_line} {lines} {func_name}")
+        # Format drift (e.g. multi-line operand tails): keep the raw text.
+        return -1, var_line
 
     idx_range, address, value = match.groups()
     var_idx = int(idx_range.split('-')[-1]) + 1
@@ -151,11 +159,20 @@ def parse_const_line(lines, func_name):
         return var_idx, f'"{value}"'
     if value.startswith("<SharedFunctionInfo"):
         value = value.split(" ", 1)[-1].rstrip('> ') if " " in value else ""
-        return var_idx, parse_shared_function_info(lines, value, func_name)
+        try:
+            return var_idx, parse_shared_function_info(lines, value, func_name)
+        except (ValueError, StopIteration):
+            return var_idx, f'"unparsed:{value}"'
     if value.startswith("<ArrayBoilerplateDescription") or value.startswith("<FixedArray"):
-        return var_idx, parse_array(lines, func_name)
+        try:
+            return var_idx, parse_array(lines, func_name)
+        except (ValueError, StopIteration, Exception):
+            return var_idx, "[]"
     if value.startswith("<ObjectBoilerplateDescription"):
-        return var_idx, parse_object(lines, func_name)
+        try:
+            return var_idx, parse_object(lines, func_name)
+        except (ValueError, StopIteration, Exception):
+            return var_idx, "{}"
     if value.startswith("<Odd Oddball"):
         return var_idx, "null"
     if value.startswith("<BigInt"):
@@ -183,6 +200,10 @@ def parse_const_array(lines, func_name):
             const_list.append(value)
             continue
         next_idx, value = parse_const_line(lines, func_name)
+        if next_idx == -1:
+            # Desync: stop consuming; pad the remainder.
+            const_list.extend([""] * (size - idx))
+            break
         const_list.append(value)
 
     return const_list
@@ -228,8 +249,29 @@ def parse_shared_function_info(lines, name, declarer=None):
     sfi.declarer = declarer
     sfi.name = 'func_unknown'
     while (line := next(lines)) not in ("End SharedFunctionInfo", None):
+        # Nested objects printed inside operand output (e.g. full
+        # SharedFunctionInfo blocks after CreateClosure operands) - recurse.
+        if line == "Start SharedFunctionInfo":
+            parse_shared_function_info(lines, None, declarer=sfi.name)
+            continue
+        if line == "Start FixedArray":
+            try:
+                parse_array(lines, sfi.name)
+            except (ValueError, StopIteration, Exception):
+                pass
+            continue
+        if line == "Start ObjectBoilerplateDescription":
+            try:
+                parse_object(lines, sfi.name)
+            except (ValueError, StopIteration, Exception):
+                pass
+            continue
+        if line in ("Start BytecodeArray", "End BytecodeArray"):
+            continue
         if "- kind: " in line:
             sfi.kind = parse("- kind: {}", line)[0]
+        if "- trusted_function_data: " in line and "BytecodeArray" in line:
+            sfi.has_bytecode = True
         if "- start position: " in line:
             start_position = parse_start_position(line)
             sfi.name = f'func_{(name or "unknown")}_{start_position}'
@@ -247,7 +289,15 @@ def parse_shared_function_info(lines, name, declarer=None):
     all_functions[sfi.name] = sfi
 
     if not sfi.is_fully_parsed():
-        raise ValueError(f"Incomplete parsing of function: {sfi.name}")
+        if any(v is not None for v in (sfi.code, sfi.const_pool)):
+            raise ValueError(f"Incomplete parsing of function: {sfi.name}")
+        # Uncompiled (lazy) function: fill in placeholders so downstream
+        # stages can skip it gracefully.
+        sfi.code = []
+        sfi.const_pool = []
+        sfi.exception_table = {}
+        if sfi.argument_count is None: sfi.argument_count = 0
+        if sfi.register_count is None: sfi.register_count = 0
 
     return sfi.name
 
@@ -257,8 +307,175 @@ def parse_file(file="test.txt"):
     while next(lines) != "Start SharedFunctionInfo":
         pass
 
-    parse_shared_function_info(lines, "start")
+    try:
+        parse_shared_function_info(lines, "start")
+    except StopIteration:
+        # Truncated tail (late disassembler crash): keep what was parsed.
+        pass
     return all_functions
+
+
+
+
+def _block_lines(block):
+    """Line iterator with repeat support over a pre-split block."""
+    state = {"lines": list(block), "i": 0, "repeat": False}
+
+    def gen():
+        while True:
+            if state["i"] >= len(state["lines"]):
+                yield None
+                continue
+            yield state["lines"][state["i"]]
+            if not state["repeat"]:
+                state["i"] += 1
+            state["repeat"] = False
+
+    return gen(), state
+
+
+def _set_repeat_for(state):
+    def setter(_value=True):
+        state["repeat"] = True
+    return setter
+
+
+def _split_blocks(lines):
+    """Split the disassembly into SharedFunctionInfo blocks, tracking nesting.
+
+    Returns a list of (parent_index, block_lines). Blocks appear in file
+    order; a nested block's parent is the enclosing block.
+    """
+    results = []  # (parent_idx, start_line_idx, end_line_idx)
+    stack = []    # indices into results
+    i = 0
+    n = len(lines)
+    while i < n:
+        line = lines[i]
+        if line == "Start SharedFunctionInfo":
+            parent = stack[-1] if stack else None
+            idx = len(results)
+            results.append([parent, i, None])
+            if stack:
+                # rewrite parent end later; children terminate before parent
+                pass
+            stack.append(idx)
+            i += 1
+            continue
+        if line == "End SharedFunctionInfo":
+            if stack:
+                idx = stack.pop()
+                results[idx][2] = i
+            i += 1
+            continue
+        i += 1
+    out = []
+    for parent, start, end in results:
+        if end is None:
+            end = n - 1
+        # Strip nested markers from the block content: children are parsed
+        # separately; keep only this function's own lines.
+        body = []
+        j = start + 1
+        depth = 0
+        while j < end:
+            l = lines[j]
+            if l == "Start SharedFunctionInfo":
+                depth += 1
+            elif l == "End SharedFunctionInfo":
+                depth -= 1
+            elif depth == 0:
+                body.append(l.strip())
+            j += 1
+        out.append((parent, body))
+    return out
+
+
+def parse_file_v15(file="test.txt"):
+    """Block-based parser for disassembly produced by newer v8 versions
+    (SharedFunctionInfo blocks nest inside operand output)."""
+    raw = []
+    with open(file, encoding="utf-8", errors="replace") as f:
+        raw = f.read().splitlines()
+
+    blocks = _split_blocks(raw)
+    global set_repeat_line_flag
+    parsed = []  # indices align with blocks
+    for parent_idx, body in blocks:
+        gen, state = _block_lines(body)
+        # per-block repeat flag
+        orig_flag = set_repeat_line_flag
+        sfi = SharedFunctionInfo()
+        declarer = parsed[parent_idx].name if parent_idx is not None and parent_idx < len(parsed) else None
+        sfi.declarer = declarer
+        sfi.name = 'func_unknown'
+        depth_guard = [0]
+        try:
+            _parse_sfi_body(sfi, gen, state)
+        except Exception as e:
+            import sys as _sys
+            print(f"block-parse-failed @{sfi.name}: {type(e).__name__}: {e}", file=_sys.stderr)
+            # Ensure placeholders even when the block failed midway.
+            if sfi.code is None: sfi.code = []
+            if sfi.const_pool is None: sfi.const_pool = []
+            if sfi.exception_table is None: sfi.exception_table = {}
+            if sfi.argument_count is None: sfi.argument_count = 0
+            if sfi.register_count is None: sfi.register_count = 0
+        if sfi.name not in all_functions:
+            all_functions[sfi.name] = sfi
+        parsed.append(sfi)
+    return all_functions
+
+
+def _parse_sfi_body(sfi, lines, state):
+    import Parser.sfi_file_parser as _self
+    # local repeat handling
+    def local_set_repeat(val=True):
+        state["repeat"] = True
+    global set_repeat_line_flag
+    old = set_repeat_line_flag
+    set_repeat_line_flag = local_set_repeat
+    try:
+        while (line := next(lines)) not in ("End SharedFunctionInfo", None):
+            stripped = line.strip()
+            if "- kind: " in stripped:
+                sfi.kind = _self.parse("- kind: {}", stripped)[0]
+            if "- trusted_function_data: " in stripped and "BytecodeArray" in stripped:
+                sfi.has_bytecode = True
+            if "- name: " in stripped and "#" in stripped:
+                nm = stripped.split("#", 1)[1].rstrip(">").strip()
+                if nm:
+                    sfi.debug_name = nm
+            if "- start position: " in stripped:
+                start_position = _self.parse("- start position: {}", stripped)[0]
+                base = getattr(sfi, "debug_name", None) or "unknown"
+                sfi.name = f'func_{base}_{start_position}'
+            if "Parameter count" in line:
+                sfi.argument_count = _self.parse_parameter_count(line)
+            elif "Register count" in line:
+                sfi.register_count = _self.parse_register_count(line)
+            elif "Constant pool" in line:
+                sfi.const_pool = _self.parse_const_pool(line, lines, sfi.name)
+            elif "Handler Table" in line:
+                sfi.exception_table = _self.parse_handler_table(line, lines)
+            elif re.search(r"@ +\d+ : ", line):
+                if sfi.code is None:
+                    sfi.code = []
+                sfi.code.extend(_self.parse_bytecode(line, lines))
+            elif line == "Start BytecodeArray" or line == "End BytecodeArray":
+                continue
+        # Always fill placeholders: partial blocks must not break downstream.
+        sfi.code = sfi.code or []
+        if sfi.const_pool is None:
+            sfi.const_pool = []
+        if sfi.exception_table is None:
+            sfi.exception_table = {}
+        if sfi.argument_count is None:
+            sfi.argument_count = 0
+        if sfi.register_count is None:
+            sfi.register_count = 0
+    finally:
+        set_repeat_line_flag = old
 
 
 if __name__ == '__main__':

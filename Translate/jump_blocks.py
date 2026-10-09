@@ -23,7 +23,15 @@ class JumpBlocks:
 
     def get_relative_offset(self, offset, n):
         # return a relative line offset to a given offset
-        new_offset = self.code_offset.index(offset) + n
+        # Tolerate gaps in the collected bytecode (dropped lines): fall back
+        # to the closest known offset.
+        if offset in self.code_offset:
+            pos = self.code_offset.index(offset)
+        else:
+            import bisect
+            pos = bisect.bisect_left(self.code_offset, offset)
+            pos = max(0, min(pos, len(self.code_offset) - 1))
+        new_offset = pos + n
         if 0 <= new_offset <= len(self.code_offset):
             return self.code_offset[new_offset]
         raise Exception(f"relative offset {new_offset} from {offset} out of range")
