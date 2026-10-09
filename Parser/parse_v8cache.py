@@ -5,20 +5,8 @@ from Parser.sfi_file_parser import parse_file, parse_file_v15
 
 
 def get_version(view8_dir, file_name):
-    # Define the relative path to the binary
-    binary_path = os.path.join(view8_dir, 'Bin', 'VersionDetector.exe')
-
-    # Ensure the binary exists and is runnable (Windows only)
-    if os.path.isfile(binary_path):
-        # Call the binary with the file name as argument
-        try:
-            result = subprocess.run([binary_path, '-f', file_name], capture_output=True, text=True, check=True)
-            # Return the output from the binary
-            return result.stdout.strip()
-        except (subprocess.CalledProcessError, OSError):
-            pass  # Not runnable on this platform; fall back below.
-
-    # Cross-platform fallback (also understands the modern V8 14+ hash).
+    # Cross-platform pure-Python detector; understands both the legacy
+    # (<= V8 13.x) and modern (V8 14+) version-hash algorithms.
     from Parser.version_detector import detect_file_version
     return detect_file_version(file_name)
 

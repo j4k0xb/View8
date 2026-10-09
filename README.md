@@ -52,15 +52,15 @@ python3 view8.py input.jsc output.js -e v8_opcode translated decompiled
 
 ## 版本探测
 
-V8 字节码文件的头部存有版本哈希。View8 支持两种探测方式：
+V8 字节码文件的头部存有版本哈希。View8 使用跨平台的纯 Python 探测器
+（`Parser/version_detector.py`，无第三方依赖）暴力匹配版本号，同时实现了
+新旧两种版本哈希算法：
 
-1. **Windows**：`Bin/VersionDetector.exe`（仅支持旧版哈希算法）
-2. **跨平台 Python 探测器**（`Parser/version_detector.py`）：上面不可用时
-   自动回退。同时实现了新旧两种版本哈希算法：
-   - 旧算法（≤ V8 13.x）：逆序折叠
-   - 新算法（V8 14+）：`base::Hasher` 正序折叠
+- 旧算法（≤ V8 13.x）：逆序折叠
+- 新算法（V8 14+）：`base::Hasher` 正序折叠
 
 探测到版本后会自动按 `Bin/<版本>/v8dasm` 查找反汇编器。
+（原 Windows 专属的 VersionDetector.exe 已移除，由 Python 探测器取代。）
 
 其他获取目标 V8 版本的途径：
 
@@ -78,7 +78,6 @@ V8 字节码文件的头部存有版本哈希。View8 支持两种探测方式�
 
 ```
 Bin/
-├── VersionDetector.exe          # Windows 版本探测器（旧算法）
 ├── 10.8.168.25/
 │   └── v8dasm                   # 10.8 反汇编器
 └── 15.0.245.31/
