@@ -1,0 +1,32 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: Jeremy Apthorp <nornagon@nornagon.net>
+Date: Tue, 16 Apr 2019 10:43:04 -0700
+Subject: build_gn.patch
+
+We force V8 into 'shared library' mode so that it exports its symbols, which is
+necessary for native modules to load.
+
+Also, some fixes relating to mksnapshot on ARM.
+
+diff --git a/BUILD.gn b/BUILD.gn
+index 7b41a7500e55a5dbbef512dd8bfcc7dbc65e982c..8039c91f8800b516a64b84a1d7a9701932decae2 100644
+--- a/BUILD.gn
++++ b/BUILD.gn
+@@ -663,7 +663,7 @@ config("internal_config") {
+     ":cppgc_header_features",
+   ]
+ 
+-  if (is_component_build) {
++  if (is_component_build || is_electron_build) {
+     defines += [ "BUILDING_V8_SHARED" ]
+   }
+ 
+@@ -6169,7 +6169,7 @@ if (current_toolchain == v8_generator_toolchain) {
+       "src/interpreter/bytecodes.h",
+     ]
+ 
+-    configs = [ ":internal_config" ]
++    configs = [ ":internal_config_base" ]
+ 
+     deps = [
+       ":v8_libbase",
