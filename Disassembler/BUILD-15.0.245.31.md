@@ -57,7 +57,8 @@ Electron / Node 运行时产生的 code cache 与裸 V8 构建的差异有三点
    - `string-inl.h`：`TryReportUnreachable` 直接返回 false（字符串分发
      遇到损坏 shape 时回退到空字符串，而不是崩溃）。
    - `string.cc`：打印前做形状校验（`StringShortPrint`、`ToCString` 入口），
-     递归校验 cons/thin/sliced 链及只读页边界，损坏字符串打印占位符。
+     递归校验 cons/thin/sliced 链及只读页边界，损坏字符串打印占位符；
+     超长字符串（>4096 字符）截断打印，避免损坏引用产生兆级垃圾输出。
    - `objects-printer.cc`：map 字合法性校验、分歧区地址守卫、
      未编译 SFI 守卫。
 3. GN 参数（`out.gn/x64.release/args.gn`）：
@@ -106,6 +107,22 @@ Electron / Node 运行时产生的 code cache 与裸 V8 构建的差异有三点
    的 RO 镜像流（插在 `kFinalizeReadOnlySpace` 之前）。
 7. 裁剪 `ro_image.bin`：取运行时 blob 从头部到 RO 段结束
    （`startup_offset` + 少量余量）的字节。
+
+## 从目标 App 自己的二进制生成预言机文件
+
+同版本号的 Electron 重编译构建（版本串 / kSize / 版本哈希完全相同）在只读堆
+第 6/7 页的布局会因编译产物差异（PGO、clang 等）而不同——code cache 里的
+引用按 App 运行时自己的布局生成。用**官方** Electron 的快照做预言机会把
+部分引用解码到对象中间，产生乱码常量。因此预言机文件应从 **App 自己的**
+运行时二进制提取：
+
+```sh
+python3 tools/extract_runtime_blob.py <App的electron二进制> Bin/15.0.245.31/ \
+        --our-blob <我们构建的mksnapshot输出> [--version 15.0.245.31-electron.0]
+```
+
+自动扫描二进制内的快照 blob（取 RO 段最大的，即 Node 的），生成
+`ro_image.bin` 与 `hybrid_snapshot.bin`，与 v8dasm 同目录即自动生效。
 
 ## 备注
 

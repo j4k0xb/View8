@@ -57,6 +57,9 @@ def parse_bytecode_line(line):
     match = re.search(r"^[^@]+@ +(\d+) : ((?:[0-9a-fA-F]{2} )+) *(.+)$", line)
     if match:
         offset, opcode, inst = match.groups()
+        # Decode \uXXXX / \xHHHH escapes in inline operands (e.g. string
+        # constants) so non-ASCII (Chinese etc.) shows as real characters.
+        inst = unescape_x_escape_to_unicode(inst)
         return CodeLine(opcode=opcode, line=int(offset), inst=inst)
     raise ValueError(f"Invalid bytecode line format: {line}")
 

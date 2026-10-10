@@ -37,6 +37,10 @@ python3 view8.py input.jsc output.js -p Bin/15.0.245.31/v8dasm
 # 输入已是反汇编文本时跳过反汇编步骤
 python3 view8.py input.txt output.js --disassembled
 
+# 同时保留原始反汇编文本（寄存器级字节码 + 常量池），存为 output.disasm.txt
+# 保留的文件可用 --disassembled 重新喂入，跳过反汇编二进制步骤
+python3 view8.py input.jsc output.js --keep-disassembly
+
 # 同时导出 V8 操作码 / 翻译结果 / 反编译代码
 python3 view8.py input.jsc output.js -e v8_opcode translated decompiled
 ```
@@ -46,6 +50,9 @@ python3 view8.py input.jsc output.js -e v8_opcode translated decompiled
 - `input_file`：输入文件（.jsc 或已反汇编文本）
 - `output_file`：输出文件
 - `--path` / `-p`：手动指定反汇编器路径（缺省时自动探测）
+- `--keep-disassembly` / `-k`：同时保存原始反汇编文本到
+  `<输出名去扩展名>.disasm.txt`（如 `a.js` → `a.disasm.txt`），便于寄存器级
+  分析与 `--disassembled` 复用
 - `--disassembled` / `-d`：输入已是反汇编文本
 - `--export_format` / `-e`：导出格式，可选 `v8_opcode`、`translated`、
   `decompiled`，可组合，默认 `decompiled`
@@ -108,6 +115,43 @@ Electron/Node 运行时产生的 code cache 与裸 V8 构建存在三方面差�
 反汇编器遇到无法恢复的损坏引用时会打印占位符（`<unreadable-object>`、
 `<diverged-ro-object>`、`<bad-string>`）并继续；尾部截断时以退出码 77
 结束，已输出内容仍然可用。
+
+## 获取最佳反编译效果（新版 Electron/Node 应用）
+
+新版运行时有一个隐蔽陷阱：**App 可能使用同版本号的自编译 Electron**
+（版本串、kSize、版本哈希与官方完全相同，但只读堆第 6/7 页布局因编译产物
+差异而不同）。用官方 Electron 的快照做预言机会把部分引用解码到对象中间，
+输出中出现乱码常量（形如 `"汯敶㩲…"` 的伪汉字）或缺字。
+
+**根治方法：用 App 自己的运行时二进制重新生成预言机文件。**
+
+```sh
+# 1. 找到 App 安装目录里最大的那个 exe（App 自带的 electron，不是官方下载版）
+#    Windows 的主程序 exe 拷到本机即可，无需执行它
+
+# 2. 一条命令重建两个 blob（需先按构建文档编好 v8）
+tools/build_blobs.sh <v8的out.gn/x64.release> <App的exe> Bin/<版本>/
+
+# 3. 重新运行即可（同目录自动注入）
+python3 view8.py app.jsc app.js
+```
+
+实测对照（某 Electron 43.5.0 重编译应用，RO 段与官方相差 296 字节）：
+
+| 指标 | 官方 Electron 快照 | App 自己的快照 |
+|---|---|---|
+| 乱码常量 | 多处 | **0** |
+| index.jsc.js 行数 | 163,690 | **390,152**（多恢复一倍函数） |
+| 中文常量行数 | 418 | 617 |
+
+经验法则：**jsc 从哪个 App 来，预言机就从那个 App 的二进制提取**。
+
+## 原理文档
+
+想了解"JS 如何被编译成 jsc 保护、jsc 又如何被反编译还原、不同版本 V8
+的反编译难点差异、两个 .bin 文件的作用原理"，请阅读
+[docs/v8-bytecode-principles-zh.md](./docs/v8-bytecode-principles-zh.md)
+（面向不了解 V8 字节码的读者，含过程图与实测数据）。
 
 ## 构建反汇编器
 
